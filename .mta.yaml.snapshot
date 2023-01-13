@@ -1,0 +1,199 @@
+_schema-version: '3.1'
+ID: URLTest3
+version: 1.0.0
+description: A simple CAP project.
+parameters:
+  deploy_mode: html5-repo
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - rm -rf build/ui-deployer
+        - mkdir -p build/ui-deployer
+        - rm -rf build/dist
+        - mkdir -p build/dist
+    - builder: custom
+      commands:
+        - npm install --production
+        - >-
+          bash -c "cds -v | grep 'cds-dk' || npm i --production --no-save
+          @sap/cds-dk @sap/mdk-tools"
+        - bash -c "export PATH=$PATH:$(pwd)/node_modules/.bin"
+        - cds build --production
+modules:
+  - name: URLTest3-URLTest3.FioriContact
+    type: html5
+    path: app/URLTest3.FioriContact
+    build-parameters:
+      builder: custom
+      commands:
+        - rm -rf dist-zip dist
+        - >-
+          npx -p @ui5/cli ui5 build --dest dist
+          --include-task=generateManifestBundle
+          --include-task=generateCachebusterInfo
+        - mkdir dist-zip
+        - >-
+          bash -c "cd dist && npx bestzip ../dist-zip/URLTest3FioriContact.zip
+          *"
+      _artifactName: URLTest3FioriContact.zip
+      supported-platforms: []
+      build-result: dist-zip
+  - name: URLTest3-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm
+      ignore:
+        - node_modules
+        - package-lock.json
+    requires:
+      - name: URLTest3-service-uaa
+      - name: URLTest3-service-db
+  - name: URLTest3-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      memory: 256MB
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    build-parameters:
+      builder: npm
+      ignore:
+        - node_modules
+        - package-lock.json
+    requires:
+      - name: URLTest3-service-uaa
+      - name: URLTest3-service-db
+      - name: URLTest3-service-destination
+      - name: URLTest3-service-metadata
+      - name: URLTest3-service-connectivity
+      - name: URLTest3-service-logs
+  - name: URLTest3-aux-destinations
+    type: com.sap.application.content
+    parameters:
+      content:
+        subaccount:
+          existing_destinations_policy: update
+          destinations:
+            - Authentication: OAuth2UserTokenExchange
+              Name: URLTest3-service-uaa
+              ServiceInstanceName: URLTest3-uaa
+              ServiceKeyName: URLTest3-uaa-key
+              sap.cloud.service: lcap.URLTest3
+            - Authentication: OAuth2UserTokenExchange
+              Name: URLTest3-app-srv
+              TokenServiceInstanceName: URLTest3-uaa
+              TokenServiceKeyName: URLTest3-uaa-key
+              URL: ~{srv-api/srv-url}
+              sap.cloud.service: lcap.URLTest3
+            - Name: URLTest3-service-html5-apps-repo-host
+              ServiceInstanceName: URLTest3-html5-apps-repo-host
+              ServiceKeyName: URLTest3-html5-apps-repo-host-key
+              sap.cloud.service: lcap.URLTest3
+    build-parameters:
+      no-source: true
+    requires:
+      - name: URLTest3-service-uaa
+        parameters:
+          service-key:
+            name: URLTest3-uaa-key
+      - name: srv-api
+      - name: URLTest3-service-html5-apps-repo-host
+        parameters:
+          service-key:
+            name: URLTest3-html5-apps-repo-host-key
+      - name: URLTest3-service-destination
+        parameters:
+          content-target: true
+  - name: URLTest3-launchpad
+    type: html5
+    path: build/launchpad
+    build-parameters:
+      builder: custom
+      commands:
+        - npm install
+        - >-
+          npx -p @ui5/cli ui5 build --dest dist
+          --include-task=generateManifestBundle
+          --include-task=generateCachebusterInfo
+        - bash -c "cd dist && npx bestzip ../../../build/dist/launchpad.zip *"
+        - rm -rf dist
+      _artifactName: launchpad.zip
+      supported-platforms: []
+      build-result: ../../build/dist
+  - name: URLTest3-aux-ui-deployer
+    type: com.sap.application.content
+    path: build/ui-deployer
+    build-parameters:
+      build-result: resources
+      requires:
+        - name: URLTest3-URLTest3.FioriContact
+          artifacts:
+            - URLTest3FioriContact.zip
+          target-path: resources
+        - name: URLTest3-launchpad
+          artifacts:
+            - launchpad.zip
+          target-path: resources
+    requires:
+      - name: URLTest3-service-html5-apps-repo-host
+        parameters:
+          content-target: true
+resources:
+  - type: org.cloudfoundry.managed-service
+    name: URLTest3-service-uaa
+    parameters:
+      service: xsuaa
+      service-plan: application
+      service-name: URLTest3-uaa
+      path: xs-security.json
+      config:
+        xsappname: URLTest3-${space}
+        role-collections: []
+  - type: org.cloudfoundry.managed-service
+    name: URLTest3-service-db
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+      service-name: URLTest3-db
+  - type: org.cloudfoundry.managed-service
+    name: URLTest3-service-destination
+    parameters:
+      service: destination
+      service-plan: lite
+      service-name: URLTest3-destination
+      config:
+        HTML5Runtime_enabled: true
+        version: 1.0.0
+  - type: org.cloudfoundry.user-provided-service
+    name: URLTest3-service-metadata
+    parameters:
+      service: metadata
+      service-plan: standard
+      service-name: URLTest3-metadata
+      config:
+        default-domain: ${default-domain}
+  - type: org.cloudfoundry.managed-service
+    name: URLTest3-service-connectivity
+    parameters:
+      service: connectivity
+      service-plan: lite
+      service-name: URLTest3-connectivity
+  - type: org.cloudfoundry.managed-service
+    name: URLTest3-service-logs
+    parameters:
+      service: application-logs
+      service-plan: lite
+      service-name: URLTest3-logs
+  - type: org.cloudfoundry.managed-service
+    name: URLTest3-service-html5-apps-repo-host
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+      service-name: URLTest3-html5-apps-repo-host

@@ -1,0 +1,5 @@
+{
+  "ProjectOverviewURL": "https://lcap-qa.launchpad.cfapps.sap.hana.ondemand.com/lcapURLTest3.URLTest3Launchpad-1.0.0",
+  "DeployedUTCTime": "2023-01-09T06:52:38.194Z",
+  "ApplicationLogURL": "https://logs.cf.sap.hana.ondemand.com/app/dashboards#/view/Overview?_g=(filters:!((query:(match_phrase:(component_name:URLTest3-srv)))))"
+}

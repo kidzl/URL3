@@ -1,0 +1,1 @@
+sap.ui.define(["sap/fe/test/ObjectPage"],function(t){"use strict";var e={actions:{},assertions:{}};return new t({appId:"URLTest3.FioriContact",componentId:"ContactsObjectPage",entitySet:"Contacts"},e)});
